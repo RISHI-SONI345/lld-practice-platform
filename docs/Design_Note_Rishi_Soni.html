@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8'>
+<title>Design Note - LLD Practice Platform</title>
+<style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #1f2937; margin: 40px; font-size: 13px; }
+    h1 { color: #111827; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 24px; font-size: 22px; }
+    h2 { color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 20px; font-size: 17px; }
+    h3 { color: #374151; font-size: 14px; margin-top: 16px; }
+    table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 12px; }
+    th, td { border: 1px solid #d1d5db; padding: 6px 10px; text-align: left; }
+    th { background-color: #f3f4f6; font-weight: 600; }
+    tr:nth-child(even) { background-color: #f9fafb; }
+    code { background: #f3f4f6; padding: 2px 5px; border-radius: 4px; font-family: Consolas, monospace; font-size: 12px; }
+    pre { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 6px; overflow-x: auto; font-family: Consolas, monospace; font-size: 11px; }
+    blockquote { border-left: 4px solid #3b82f6; margin: 0; padding-left: 14px; color: #4b5563; font-style: italic; }
+    ul, ol { padding-left: 20px; }
+    li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<h1>Design note</h1>
+<h2>The five questions in the brief</h2>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Our answer</th>
+<th>Lives in</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What must a learner provide for an attempt to be meaningful?</td>
+<td>Java code against a skeleton, plus assumptions and a one-line rationale for the pattern used and the pattern rejected. Code shows structure; the text shows intent, which rules cannot see.</td>
+<td><code>Submission</code>, <code>Rationale</code></td>
+</tr>
+<tr>
+<td>What makes feedback useful when several designs are valid?</td>
+<td>Every finding cites evidence from the learner's own code, says why it matters, and proposes a fix. Judgment is scored against decision points that list several accepted approaches, not one reference answer. Each finding is labelled FACT or JUDGMENT.</td>
+<td><code>Finding</code>, <code>DecisionPoint</code></td>
+</tr>
+<tr>
+<td>What is deterministic and what is LLM?</td>
+<td>Deterministic: anything countable from structure (size, cycles, literals, switch on type, missing capability). LLM: cohesion, pattern fit, trade-offs, and how well the change request was absorbed. An LLM finding that cites a class or method not in the code is dropped.</td>
+<td><code>Rule</code>, <code>LlmDesignReviewEvaluator</code>, <code>FindingValidator</code></td>
+</tr>
+<tr>
+<td>How would another format or approach fit later?</td>
+<td>A new format is a new <code>SubmissionParser</code> registered under its format key that emits the same <code>DesignModel</code>. A new approach is a new <code>Evaluator</code> that declares its stage. Neither change touches the other side.</td>
+<td><code>ParserRegistry</code>, <code>Evaluator</code></td>
+</tr>
+<tr>
+<td>What happens when evaluation is slow or fails?</td>
+<td>FACT findings are saved and shown before the LLM runs. The LLM stage runs in the background with a timeout and bounded retries. If it still fails the attempt ends PARTIAL with a retry button. If nothing parses it ends FAILED with the parse errors.</td>
+<td><code>AttemptLifecycle</code>, <code>EvaluationOrchestrator</code></td>
+</tr>
+</tbody>
+</table>
+<h2>Class design</h2>
+<p>Ports-and-adapters monolith. Immutable domain records in the middle, two extension interfaces (<code>SubmissionParser</code>, <code>Evaluator</code>), and thin adapters at the edge.</p>
+<pre><code>web ──&gt; services ──&gt; ports/domain &lt;── adapters
+                     model, problem,    JavaCodeParser, Gemini/Demo/Fake LlmClient,
+                     evaluation,        JpaAttemptRepository, YamlProblemRepository,
+                     attempt            ExecutorEvaluationScheduler, MermaidClassDiagramRenderer
+</code></pre>
+<p>Dependency rules, enforced by <code>ArchitectureTest</code> (it scans imports):</p>
+<ul>
+<li><code>model</code> imports nothing from the project. <code>problem</code> imports <code>model</code>. <code>evaluation</code> imports <code>model</code> and <code>problem</code> only.</li>
+<li><code>web</code> talks to services only, never to a repository, an evaluator or the LLM.</li>
+<li>Domain records contain no Spring types.</li>
+</ul>
+<p>Key types:</p>
+<ul>
+<li><code>DesignModel</code> is the one format-independent picture of a design. Every evaluator reads only this. It includes <code>ClassNode</code> (with <code>signatureHash</code> and <code>bodyHash</code>), <code>MethodNode</code> and <code>MethodSignals</code> (facts from a method body so rules never touch source text), and <code>Relationship</code> (EXTENDS, IMPLEMENTS, HAS_A, USES).</li>
+<li><code>Attempt</code> changes status only through <code>apply(event)</code>, which asks <code>AttemptLifecycle</code>.</li>
+<li><code>EvaluatorRun</code> records what each evaluator did, so a failure is visible and never silent.</li>
+</ul>
+<h2>Patterns used, and why</h2>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Where</th>
+<th>Why this one</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Strategy</td>
+<td><code>Rule</code>, <code>Evaluator</code></td>
+<td>A new check is a new class. The orchestrator never changes.</td>
+</tr>
+<tr>
+<td>Registry</td>
+<td><code>ParserRegistry</code></td>
+<td>Selects the parser by format and fails fast on an unknown one.</td>
+</tr>
+<tr>
+<td>Adapter</td>
+<td><code>GeminiLlmClient</code>, <code>DemoLlmClient</code>, <code>FakeLlmClient</code> behind <code>LlmClient</code></td>
+<td>Provider types stay out of the domain; the fake plugs into the same port for tests.</td>
+</tr>
+<tr>
+<td>Repository</td>
+<td><code>AttemptRepository</code>, <code>ProblemRepository</code></td>
+<td>The domain does not know about H2 or YAML.</td>
+</tr>
+<tr>
+<td>Transition table</td>
+<td><code>AttemptLifecycle</code></td>
+<td>The six states differ only in which transitions are legal, not in behaviour.</td>
+</tr>
+<tr>
+<td>Immutable value objects</td>
+<td><code>Submission</code>, <code>DesignModel</code>, <code>Finding</code></td>
+<td>Safe to share between the immediate stage, the background stage and the history diff.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rejected on purpose:</strong> GoF State classes for the lifecycle (six near-empty classes); Observer or an event bus (one process, the orchestrator calls directly); Factory and Builder beyond Spring injection (nothing needs polymorphic creation); Decorator. Visitor appears only inside <code>JavaCodeParser</code>, because JavaParser provides it. Over-engineering with unneeded patterns is a named interview mistake, so we left them out.</p>
+<h2>Evaluation</h2>
+<p>Stage one (milliseconds, synchronous): parse, then seven rules produce FACT findings, saved before anything else happens. Stage two (background): one LLM review produces JUDGMENT findings.</p>
+<p>The seven rules: <code>GOD_CLASS</code>, <code>TYPE_SWITCH</code>, <code>HARDCODED_VALUE</code>, <code>CONCRETE_DEPENDENCY</code>, <code>DEPENDENCY_CYCLE</code> (Tarjan strongly connected components), <code>ORPHAN_OR_UNUSED</code>, <code>CAPABILITY_OWNERSHIP</code>. Parser warnings are saved as FACT findings with rule id <code>PARSE_ISSUE</code>. Thresholds are starting defaults in <code>RuleThresholds</code>.</p>
+<p>The LLM sees requirements, decision points, assumptions and rationale, the model as compact text (no method bodies), and the facts already found. Temperature 0, a neutral template, a fixed category list, at most 8 findings. <code>FindingValidator</code> runs on every reply and records how many findings it dropped and why in the <code>EvaluatorRun</code> message.</p>
+<h2>Failure handling</h2>
+<table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No class parses from any file</td>
+<td>FAILED, parse errors shown</td>
+</tr>
+<tr>
+<td>Syntax error outside a method body in one file</td>
+<td>That file is skipped with a warning; other files count</td>
+</tr>
+<tr>
+<td>Syntax error inside a method body</td>
+<td>Structure kept, warning added</td>
+</tr>
+<tr>
+<td>Compile errors, missing imports, unknown types</td>
+<td>Ignored; we never compile</td>
+</tr>
+<tr>
+<td>LLM timeout or transport error</td>
+<td>One retry after a back-off, then PARTIAL</td>
+</tr>
+<tr>
+<td>LLM returns malformed JSON</td>
+<td>One repair retry that includes the parse error, then PARTIAL</td>
+</tr>
+<tr>
+<td>LLM cites classes or methods that do not exist</td>
+<td>Those findings dropped and counted; attempt still COMPLETED</td>
+</tr>
+<tr>
+<td>A rule throws</td>
+<td>That rule is skipped and noted; the others still report</td>
+</tr>
+<tr>
+<td>Resubmit while evaluating</td>
+<td>A new attempt; the earlier one finishes on its own</td>
+</tr>
+<tr>
+<td>Retry pressed twice</td>
+<td>Second event is an illegal transition, rejected with a clear message</td>
+</tr>
+<tr>
+<td>Server restarts mid-evaluation</td>
+<td><code>StaleEvaluationRecovery</code> moves it to PARTIAL ("interrupted") so retry works</td>
+</tr>
+</tbody>
+</table>
+<p>Each row above has a test.</p>
+<h2>Deviations from the build spec</h2>
+<p>These were decisions made while building. They should be reviewed.</p>
+<ol>
+<li><strong>Fingerprint has an optional discriminator.</strong> The spec says <code>ruleId + subject</code>. Two missing capabilities on the same entry type would then merge in the history diff, so <code>Finding</code> carries an optional discriminator (the capability id, or the parse-issue line). For every other finding the fingerprint is exactly <code>ruleId|subject</code>.</li>
+<li><strong>"Restates a FACT" is narrower than "same subject".</strong> Dropping every LLM finding on a subject that has any rule finding would discard useful judgment. <code>FindingValidator</code> drops an LLM finding only when a FACT on the same subject is from a related rule (for example <code>COHESION</code> vs <code>GOD_CLASS</code>). The mapping is a small table in that class.</li>
+<li><strong>Startup recovery is not deadline-based.</strong> At startup nothing can be running in this process, so every attempt still SUBMITTED or EVALUATING is treated as interrupted. A deadline test would leave a just-crashed attempt stuck until the deadline passed.</li>
+<li><strong>The service, not the orchestrator, hands the deferred stage to the scheduler.</strong> This avoids a cycle (orchestrator → scheduler → orchestrator). The behaviour is the same.</li>
+<li><strong><code>ProblemCatalog</code> service</strong> wraps <code>ProblemRepository</code> so the web layer never touches a repository.</li>
+<li><strong>Extra endpoint <code>POST /attempts/{id}/edit-again</code></strong> implements the "Edit and resubmit" button for FAILED attempts: a new draft that keeps the learner's code.</li>
+<li><strong>Demo mode</strong> (no <code>GEMINI_API_KEY</code>) returns a clearly labelled placeholder so the app runs without an account.</li>
+<li><strong>The entry-signature exclusion is narrower.</strong> The spec ignores any method that repeats an entry-type method's name and parameter count. Run against the Elevator problem this wrongly rejected <code>Elevator.step()</code> (behind <code>ElevatorSystem.step()</code>), the natural mover. Now only the entry type's own <em>public</em> methods are excluded as owners; a same-named method in another class counts as the delegation it is, and a private helper in the entry type can own a capability. Tested.</li>
+<li><strong>Fields carry their declared type.</strong> <code>FieldNode.type</code> stays the unwrapped name used for relationships, and a new <code>declaredType</code> keeps what the learner wrote (<code>List&lt;Elevator&gt;</code>). The AI prompt and the diagram use it. Before this, the model was told only <code>Elevator</code> and made two wrong claims about the code (a "single reference" and a "raw TreeSet").</li>
+<li><strong>Enum constants, field names and class names count as weaker evidence for a capability.</strong> A design that handles doors through a <code>DOORS_OPEN</code> state and no <code>open()</code> method was getting a false HIGH "nobody handles doors". <code>ClassNode</code> now records enum constants, and when no method matches, <code>CAPABILITY_OWNERSHIP</code> reports MEDIUM ("implied, give it a method") if those words appear elsewhere, and HIGH only when there is no trace at all.</li>
+<li><strong>Longer LLM time limits than the spec's defaults.</strong> The spec suggests 30 s per call and 90 s overall. A real Gemini review of an Elevator design took 29.6 s in the server log, one second under the limit, so a slightly slower reply would have been cut off and retried. Defaults are now 60 s per call and 150 s overall (<code>EvaluationProperties</code>, <code>lld.llm.timeout-seconds</code>).</li>
+<li><strong>The parser is thread-safe.</strong> <code>JavaCodeParser</code> is a singleton used from request threads and the background thread. JavaParser keeps mutable state, so two overlapping parses could report valid code as a syntax error. Each thread now has its own parser and printer; a 400-call, 8-thread test failed before the fix.</li>
+<li><strong>Light / Dark / System theme toggle</strong> in the header, remembered in the browser; the diagram is redrawn in the matching colours.</li>
+<li><strong>Java level.</strong> The platform builds for Java 17 and was run on 21. The learner's code is parsed at Java 17 as the spec says.</li>
+</ol>
+<h2>Limits (also in the README)</h2>
+<p>Structure is read, never run. Java only, top-level types only. The AI sees signatures, not bodies. Thresholds are untuned. <code>CAPABILITY_OWNERSHIP</code> matches name fragments. Blast-radius cut-offs are heuristics. The live Gemini call and the in-browser diagram were not exercised in this build.</p>
+<h2>Not done</h2>
+<p>Cut as the spec allows: countdown timer, the "disagree" button on findings, the alternative-approaches reveal, and a second (Mermaid) parser to prove the extension point. Not done, and worth doing before trusting the AI review: checking it against 3 to 4 hand-written good and bad solutions per problem with the real model. Hand-written good and bad Parking Lot samples exist and are used by the rule and flow tests, but not for Elevator or Vending Machine.</p>
+</body>
+</html>

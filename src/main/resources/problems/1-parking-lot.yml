@@ -1,0 +1,110 @@
+id: parking-lot
+title: Parking Lot
+statement: Design a multi-floor parking lot that assigns spots, issues tickets and charges a fee on exit.
+requirements:
+  - A lot has several floors, each with spots of different sizes.
+  - Vehicles are motorcycles, cars and trucks. A vehicle may only use a spot that fits it.
+  - On entry the system assigns a spot and issues a ticket. If nothing fits, entry is refused with a clear reason.
+  - On exit the system computes the fee from entry time, exit time and vehicle type, then frees the spot. Part hours round up.
+  - Hourly rates differ by vehicle type.
+  - The system can report free spots per floor.
+  - An unknown or already-used ticket is rejected at exit.
+entryTypes:
+  - ParkingLotService
+skeleton:
+  - name: ParkingLotService.java
+    content: |
+      /** Entry point of the parking lot. Keep these two method signatures. */
+      public class ParkingLotService {
+
+          /** Assigns a spot and issues a ticket. Refuse with a clear reason if nothing fits. */
+          public Ticket park(Vehicle vehicle) {
+              throw new UnsupportedOperationException("TODO");
+          }
+
+          /** Computes the fee, frees the spot and returns a receipt. Reject an unknown or used ticket. */
+          public Receipt unpark(Ticket ticket) {
+              throw new UnsupportedOperationException("TODO");
+          }
+      }
+  - name: Vehicle.java
+    content: |
+      /** Something that wants to park. Add what you need. */
+      public class Vehicle {
+      }
+  - name: Ticket.java
+    content: |
+      /** Proof of entry. Add what you need. */
+      public class Ticket {
+      }
+  - name: Receipt.java
+    content: |
+      /** Proof of payment on exit. Add what you need. */
+      public class Receipt {
+      }
+capabilities:
+  - id: assign-spot
+    description: assign a spot to a vehicle
+    nameHints: [assign, allocate, find, reserve, park]
+    watchLiterals: false
+  - id: release-spot
+    description: release a spot when a vehicle leaves
+    nameHints: [release, vacate, free, unpark, exit]
+    watchLiterals: false
+  - id: compute-fee
+    description: compute the parking fee
+    nameHints: [fee, charge, price, cost, rate, bill]
+    watchLiterals: true
+  - id: track-capacity
+    description: track how many spots are free
+    nameHints: [capacity, available, availability, full, count]
+    watchLiterals: true
+decisionPoints:
+  - id: fee-computation
+    question: How is the fee computed?
+    approaches:
+      - id: pricing-policy
+        name: A pricing policy per vehicle type
+        signals: [interface with a fee method, one implementation per vehicle type]
+        tradeoff: New vehicle types need a new policy class, but no existing code changes.
+      - id: rate-table
+        name: A rate table injected as data
+        signals: [Map from vehicle type to rate, rate passed in the constructor]
+        tradeoff: Simple and configurable, but cannot express rules that differ in shape, such as a daily cap.
+      - id: fee-on-vehicle
+        name: Fee logic on the vehicle class
+        signals: [Vehicle subclasses override a fee method]
+        tradeoff: Easy to follow, but mixes pricing with the vehicle model.
+  - id: spot-selection
+    question: How is a spot chosen?
+    approaches:
+      - id: allocation-strategy
+        name: An allocation strategy
+        signals: [interface for choosing a spot, nearest or first-fit implementations]
+        tradeoff: Easy to swap the policy; one more type to understand.
+      - id: floor-finds
+        name: Each floor finds a spot and the lot picks a floor
+        signals: [Floor has a find or assign method, lot loops over floors]
+        tradeoff: Keeps the search close to the data; the lot still decides the order of floors.
+      - id: single-scan
+        name: One scan in the lot class
+        signals: [nested loops inside the lot class]
+        tradeoff: Fewest classes, but the lot class grows with every new rule.
+  - id: fit-decision
+    question: How is it decided that a vehicle fits a spot?
+    approaches:
+      - id: can-fit
+        name: A canFit method on the spot
+        signals: [method on Spot taking a vehicle or size]
+        tradeoff: The spot owns the rule; the spot must know about vehicle sizes.
+      - id: size-compare
+        name: Compare size values
+        signals: [enum with ordering, comparison of sizes]
+        tradeoff: Compact; a new size or special spot may need code changes in the comparison.
+      - id: instanceof-chain
+        name: instanceof checks on the vehicle
+        signals: [instanceof Motorcycle, instanceof Car]
+        tradeoff: Works for a first version, but every new vehicle type edits this code.
+changeRequest:
+  id: ev-spots
+  text: Add electric-vehicle spots with charging. An EV is given an EV spot when one is free, and charging time is billed at a separate rate.

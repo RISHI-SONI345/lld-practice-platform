@@ -1,0 +1,105 @@
+id: vending-machine
+title: Vending Machine
+statement: Design a vending machine that takes money, dispenses products and returns change.
+requirements:
+  - A machine has coded slots, each holding one product with a price and a quantity.
+  - A user selects a product, inserts money in accepted denominations, and the machine dispenses the product and returns change.
+  - Insufficient money, a sold-out slot and an unknown code are reported clearly.
+  - A user can cancel before dispensing and gets all inserted money back.
+  - If exact change cannot be made, the machine refuses the sale and refunds.
+  - An operator can restock a slot.
+entryTypes:
+  - VendingMachine
+skeleton:
+  - name: VendingMachine.java
+    content: |
+      /** Entry point of the machine. Keep these four method signatures. */
+      public class VendingMachine {
+
+          /** The user picks a slot by its code. Report an unknown code or a sold-out slot clearly. */
+          public void selectProduct(String code) {
+              throw new UnsupportedOperationException("TODO");
+          }
+
+          /** The user inserts one coin or note. The denomination is in cents. */
+          public void insertMoney(int denomination) {
+              throw new UnsupportedOperationException("TODO");
+          }
+
+          /** Dispenses the selected product and returns change. */
+          public Product dispense() {
+              throw new UnsupportedOperationException("TODO");
+          }
+
+          /** Cancels the sale and returns all inserted money. */
+          public void cancel() {
+              throw new UnsupportedOperationException("TODO");
+          }
+      }
+  - name: Product.java
+    content: |
+      /** Something the machine sells. Add what you need. */
+      public class Product {
+      }
+capabilities:
+  - id: manage-inventory
+    description: keep track of stock in each slot
+    nameHints: [stock, inventory, restock, quantity, available]
+    watchLiterals: false
+  - id: accept-payment
+    description: accept payment
+    nameHints: [insert, pay, accept, balance, payment]
+    watchLiterals: false
+  - id: make-change
+    description: make change
+    nameHints: [change, refund, return]
+    watchLiterals: true
+  - id: dispense-product
+    description: dispense the product
+    nameHints: [dispense, deliver, vend]
+    watchLiterals: false
+decisionPoints:
+  - id: state-behaviour
+    question: How does behaviour depend on machine state?
+    approaches:
+      - id: state-pattern
+        name: The State pattern
+        signals: [state interface, Idle, HasMoney or Dispensing classes]
+        tradeoff: Each state is isolated; more classes for a small machine.
+      - id: enum-switch
+        name: An enum with a switch
+        signals: [enum of states, switch on the state]
+        tradeoff: Compact, but adding a state edits every switch.
+      - id: boolean-flags
+        name: Boolean flags
+        signals: [fields such as hasMoney and hasSelection]
+        tradeoff: Quick to write, but invalid combinations are easy to reach.
+  - id: change-making
+    question: How is change made?
+    approaches:
+      - id: change-strategy
+        name: A change strategy
+        signals: [interface for making change, greedy implementation]
+        tradeoff: Easy to swap the algorithm; one more type.
+      - id: inline-greedy
+        name: A greedy loop inline
+        signals: [loop over denominations inside the machine class]
+        tradeoff: Simple, but mixed into the machine and hard to test alone.
+      - id: hardcoded-list
+        name: A hard-coded denomination list
+        signals: [array of numbers in the code]
+        tradeoff: Fast to write, but changing denominations means editing code.
+  - id: payment-model
+    question: How is payment modelled?
+    approaches:
+      - id: payment-abstraction
+        name: A payment abstraction
+        signals: [Payment interface, Cash implementation]
+        tradeoff: Adding card payments is a new class; more up-front design.
+      - id: coins-only
+        name: Coins only
+        signals: [balance field, insertMoney adds to it]
+        tradeoff: Smallest design, but card payments would need broad changes.
+changeRequest:
+  id: card-payments
+  text: Add card payments alongside cash. A card sale needs no change and can be declined.

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head(${problem.title()})}"></head>
+<body>
+<header th:replace="~{fragments :: nav}"></header>
+<main>
+  <p class="muted"><a th:href="@{/}">Problems</a></p>
+  <h1 th:text="${problem.title()}">Problem</h1>
+  <p class="lead" th:text="${problem.statement()}">Statement</p>
+  <h2>Requirements</h2>
+  <ul class="plain"><li th:each="r : ${problem.requirements()}" th:text="${r}">Requirement</li></ul>
+  <h2>What you submit</h2>
+  <ul class="plain">
+    <li>Java code written against the skeleton. Keep the entry class
+      <strong th:text="${#strings.listJoin(problem.entryTypes(), ', ')}">Entry</strong> and its method signatures.</li>
+    <li>Short assumptions, and one line each for the pattern you used and the pattern you rejected.</li>
+  </ul>
+  <form th:action="@{/problems/{id}/attempts(id=${problem.id()})}" method="post">
+    <button type="submit">Start attempt</button>
+    <a class="button secondary" th:href="@{/problems/{id}/history(id=${problem.id()})}">Attempt history</a>
+  </form>
+</main>
+</body>
+</html>

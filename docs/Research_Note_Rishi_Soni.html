@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8'>
+<title>Research Note - LLD Practice Platform</title>
+<style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #1f2937; margin: 40px; font-size: 13px; }
+    h1 { color: #111827; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 24px; font-size: 22px; }
+    h2 { color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 20px; font-size: 17px; }
+    h3 { color: #374151; font-size: 14px; margin-top: 16px; }
+    table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 12px; }
+    th, td { border: 1px solid #d1d5db; padding: 6px 10px; text-align: left; }
+    th { background-color: #f3f4f6; font-weight: 600; }
+    tr:nth-child(even) { background-color: #f9fafb; }
+    code { background: #f3f4f6; padding: 2px 5px; border-radius: 4px; font-family: Consolas, monospace; font-size: 12px; }
+    pre { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 6px; overflow-x: auto; font-family: Consolas, monospace; font-size: 11px; }
+    blockquote { border-left: 4px solid #3b82f6; margin: 0; padding-left: 14px; color: #4b5563; font-style: italic; }
+    ul, ol { padding-left: 20px; }
+    li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<h1>Research note</h1>
+<p>Pages read as of 2026-10-13. Each tool row below is labelled by what kind of source it comes from: <strong>vendor page</strong> (the product's own site) or <strong>project listing</strong> (a third-party listing of the product). Only what those pages say is recorded here.</p>
+<h2>The gap</h2>
+<p>The LLD practice pages we could read score a learner's answer against a reference solution or a rubric. None of them says which feedback is produced by a repeatable rule and which is a model's opinion. That is the gap this platform is built on.</p>
+<h2>How a learner practises</h2>
+<p>Hello Interview's preparation guide splits an LLD answer into five timed phases: requirements, entities and relationships, class design, implementation, and verification by tracing a scenario. It says pseudocode is usually acceptable and lists over-engineering and unrequested methods among common mistakes (<a href="https://www.hellointerview.com/blog/how-to-prepare-lld">guide</a>). This supports two choices here: a staged attempt, and a one-line rationale for the pattern used and the pattern rejected.</p>
+<h2>What existing tools do</h2>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>What the learner gives</th>
+<th>Feedback</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AlgoMaster</td>
+<td>Timed AI-led mock interview in four stages; in-browser code editor in the last.</td>
+<td>Each stage scored out of 10 with notes, using the answer, the conversation and a reference solution. Attempts are saved.</td>
+<td>vendor page: <a href="https://algomaster.io/interview/low-level-design">algomaster.io</a></td>
+</tr>
+<tr>
+<td>Hello Interview</td>
+<td>Guided step-by-step practice, 8 LLD problems.</td>
+<td>"Instant AI feedback", rubric-based per step.</td>
+<td>vendor page: <a href="https://www.hellointerview.com/practice">practice</a></td>
+</tr>
+<tr>
+<td>Codemia</td>
+<td>UML class diagrams and design-pattern practice. The page gives conflicting problem counts.</td>
+<td>"AI Design Review". Whether resubmission is allowed is not stated.</td>
+<td>vendor page: <a href="https://codemia.io">codemia.io</a></td>
+</tr>
+<tr>
+<td>Coudo AI</td>
+<td>UML diagram in a custom editor or by chat; machine-coding problems.</td>
+<td>Instant AI review of diagrams and code, plus peer reviews.</td>
+<td>project listing: <a href="https://peerlist.io/shivam_chauhan/project/coudo-ai">peerlist</a></td>
+</tr>
+<tr>
+<td>LowLevelDesign Mastery</td>
+<td>Code written and run in a browser playground, six languages.</td>
+<td>AI feedback on correctness and complexity; flashcards and diagrams.</td>
+<td>project listing: <a href="https://peerlist.io/vdsanku/project/lowleveldesign-mastery">peerlist</a></td>
+</tr>
+<tr>
+<td>LLDCanvas, CodeZym, LLDHub</td>
+<td>Not verified</td>
+<td>Not verified</td>
+<td>LLDCanvas blocks automated reading; searches found nothing for the other two</td>
+</tr>
+</tbody>
+</table>
+<p>Not confirmed, so not claimed: a peer library of shared solutions at Hello Interview; pattern suggestions at Coudo AI; resubmission at Codemia; anything about LLDCanvas, CodeZym or LLDHub.</p>
+<h2>Gaps we use</h2>
+<ol>
+<li><strong>Fact versus judgment.</strong> No page we read labels which findings come from rules and which from a model. Every finding here carries <code>FACT</code> or <code>JUDGMENT</code>, and the report puts facts first.</li>
+<li><strong>No single reference answer.</strong> AlgoMaster states it grades against a reference solution. We grade against decision points with several accepted approaches, so a different valid design is not marked wrong.</li>
+<li><strong>Cost of change to the learner's own design.</strong> None of the pages we read describes measuring how much of the learner's own design breaks under a new requirement. We report this as blast radius.</li>
+<li><strong>No execution.</strong> AlgoMaster and LowLevelDesign Mastery run code. We parse structure only and say so, which removes the sandbox but also means behaviour is never tested.</li>
+</ol>
+<h2>Evidence behind the design</h2>
+<ul>
+<li><strong>Why the split.</strong> One recent study finds that a model judging unchanged code can change its verdict with prompt cues and across repeated runs, and recommends neutral templates and checks that can be run (<a href="https://arxiv.org/abs/2604.16790">arXiv 2604.16790</a>). Another finds a judge can be very consistent across runs without being valid (<a href="https://arxiv.org/abs/2606.19544">arXiv 2606.19544</a>). So anything countable stays out of the model, the prompt is neutral, temperature is 0, and the AI output is labelled advisory. Consistency would not prove it right.</li>
+<li><strong>Why the God Class rule is limited.</strong> The published detection strategy combines access to foreign data, weighted method count and class cohesion (<a href="https://homepages.dcc.ufmg.br/~figueiredo/disciplinas/lectures/detection-strategy_v01.pdf">Marinescu, detection strategies</a>). The latter two need body-level analysis we do not do, so <code>GOD_CLASS</code> counts members only and says so.</li>
+<li><strong>Why parse failures are per file.</strong> JavaParser recovers at statement level and at file level, and a file it cannot recover keeps little beyond the token range (<a href="https://javaparser.org/parse-error-recovery">JavaParser docs</a>). So a partial model is per file, not per declaration.</li>
+</ul>
+<h2>What this research does not show</h2>
+<p>It shows what the vendors say on their pages, not how good their feedback is. We did not test the tools ourselves, and we did not validate our own AI review against a panel of human reviewers. Those are the weakest points of the evidence.</p>
+</body>
+</html>

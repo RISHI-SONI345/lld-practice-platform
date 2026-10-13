@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('LLD Practice')}"></head>
+<body>
+<header th:replace="~{fragments :: nav}"></header>
+<main>
+  <h1>Low-Level Design Practice</h1>
+  <p class="lead">Pick a problem, write Java against the skeleton, and get feedback that tells you which findings are
+    rule-based facts and which are AI opinion. Your code is read, never run.</p>
+  <ul class="cards">
+    <li class="card" th:each="p : ${problems}">
+      <h2><a th:href="@{/problems/{id}(id=${p.id()})}" th:text="${p.title()}">Problem</a></h2>
+      <p th:text="${p.statement()}">Statement</p>
+      <th:block th:with="a=${latest.get(p.id())}">
+        <p class="muted" th:if="${a != null}">
+          Latest attempt:
+          <a th:href="@{/attempts/{id}(id=${a.id()})}">#<span th:text="${a.sequence()}">1</span></a>
+          <span class="badge" th:classappend="${a.status()}" th:text="${a.status()}">DRAFT</span>
+        </p>
+        <p class="muted" th:if="${a == null}">Not started yet</p>
+      </th:block>
+    </li>
+  </ul>
+</main>
+</body>
+</html>

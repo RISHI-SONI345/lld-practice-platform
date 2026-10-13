@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8'>
+<title>README & AI USAGE - LLD Practice Platform</title>
+<style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #1f2937; margin: 40px; font-size: 13px; }
+    h1 { color: #111827; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 24px; font-size: 22px; }
+    h2 { color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-top: 20px; font-size: 17px; }
+    h3 { color: #374151; font-size: 14px; margin-top: 16px; }
+    table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 12px; }
+    th, td { border: 1px solid #d1d5db; padding: 6px 10px; text-align: left; }
+    th { background-color: #f3f4f6; font-weight: 600; }
+    tr:nth-child(even) { background-color: #f9fafb; }
+    code { background: #f3f4f6; padding: 2px 5px; border-radius: 4px; font-family: Consolas, monospace; font-size: 12px; }
+    pre { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 6px; overflow-x: auto; font-family: Consolas, monospace; font-size: 11px; }
+    blockquote { border-left: 4px solid #3b82f6; margin: 0; padding-left: 14px; color: #4b5563; font-style: italic; }
+    ul, ol { padding-left: 20px; }
+    li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<h1>LLD Practice Platform</h1>
+<p>A small Spring Boot app where a learner practises Low-Level Design on three problems (Parking Lot, Elevator, Vending Machine), submits Java code, and gets feedback that separates <strong>rule-based facts</strong> from <strong>AI judgment</strong>.</p>
+<p>The loop: choose a problem, design, submit, get feedback, review, try again. A change request for each problem measures how much of the learner's own design had to move.</p>
+<h2>Run it</h2>
+<p>Requires JDK 17 or newer (built and tested on 21). Nothing else to install; Maven is bundled as <code>mvnw</code>.</p>
+<pre><code>./mvnw spring-boot:run          # Windows: mvnw.cmd spring-boot:run
+</code></pre>
+<p>Open http://localhost:8080. Attempts are stored in <code>./data/lld-practice.mv.db</code> and survive a restart.</p>
+<h3>The AI review</h3>
+<p>Set <code>GEMINI_API_KEY</code> to use the real review (optional <code>GEMINI_MODEL</code>, default <code>gemini-2.5-flash</code>).</p>
+<p>Without a key the app runs in <strong>demo mode</strong>: the AI stage returns a single placeholder note that says so. Everything else (parsing, the seven rules, the diagram, history, the change round) is real. Demo mode exists so the whole flow can be tried with no account.</p>
+<h2>Test it</h2>
+<pre><code>./mvnw test
+</code></pre>
+<p>158 tests (one is the opt-in live review check, skipped unless <code>GEMINI_API_KEY</code> is set). They cover the parser, each rule, the failure paths (timeout, malformed JSON, invented classes, nothing parses, a throwing rule, a restart mid-evaluation, retry pressed twice), the change round, the history diff, the persistence round trip, the HTTP flow including HTML escaping, and an architecture test that enforces the package dependency rules. Tests use a scripted <code>FakeLlmClient</code>, so none of them call a real model.</p>
+<h2>What it does</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>What the learner sees</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FACT</td>
+<td>Seven deterministic rules on the structure of their code, available immediately. Labelled <code>FACT</code>.</td>
+</tr>
+<tr>
+<td>JUDGMENT</td>
+<td>One LLM review, run in the background. Labelled "AI opinion, advisory". Findings that cite classes or methods not in the code are dropped.</td>
+</tr>
+<tr>
+<td>Change round</td>
+<td>Edit the same code for the problem's change request. Shown as added / modified / removed / interfaces touched, with an ADDITIVE, CONTAINED or SPREAD verdict.</td>
+</tr>
+<tr>
+<td>History</td>
+<td>Resolved / new / persisting findings against the previous attempt, matched by fingerprint.</td>
+</tr>
+</tbody>
+</table>
+<p>Attempt states: <code>DRAFT → SUBMITTED → EVALUATING → COMPLETED | PARTIAL | FAILED</code>. If the AI stage fails after retries the attempt ends <code>PARTIAL</code>: the facts stay and a Retry button appears. If nothing in the submission parses it ends <code>FAILED</code> with the parse errors.</p>
+<h2>Limits you should know about</h2>
+<ul>
+<li><strong>Code is parsed, never compiled or run.</strong> Compile errors, missing imports and unknown types are ignored. Behaviour is not tested.</li>
+<li><strong>Java only</strong>, top-level types only. Nested types are skipped with a visible warning.</li>
+<li>The AI review sees class names, signatures and relationships, <strong>not method bodies</strong>.</li>
+<li>Rule thresholds (for example "more than 12 methods") are starting defaults and have not been tuned against real learner submissions. They live in <code>RuleThresholds</code>.</li>
+<li><code>CAPABILITY_OWNERSHIP</code> matches name fragments, so it can miss an unconventional name.</li>
+<li>The blast-radius cut-offs (CONTAINED = at most 2 touched and not more than added) are heuristics, configurable in <code>EvaluationProperties</code>.</li>
+<li>A learner is a cookie, not an account. Clearing cookies loses access to earlier attempts in the UI (the data stays in the database).</li>
+<li>The real Gemini call was run once end to end (model <code>gemini-flash-latest</code>, Parking Lot skeleton): it returned 3 findings that passed validation. That is one smoke run, not an evaluation of review quality.</li>
+<li>The class diagram is drawn in the browser by Mermaid (served from a WebJar, no CDN). It was checked in Chrome on the dark theme (it follows the system light/dark setting). The Mermaid source is always shown in a collapsed block as a fallback. Field types keep their generics in the diagram (<code>List~Elevator~</code>).</li>
+<li>History times are shown in UTC.</li>
+<li>While the AI review runs the page shows a spinner and an elapsed-seconds counter; buttons that trigger slow actions show a busy state.</li>
+<li><code>CAPABILITY_OWNERSHIP</code> is a name-fragment heuristic. When no method is named after a capability it also looks for the same words in enum constants, field names and class names. If it finds them it reports MEDIUM (implied, give it an explicit method) instead of HIGH. If the design never uses those words at all, HIGH remains.</li>
+</ul>
+<h2>Layout</h2>
+<pre><code>model/          immutable domain records (depend on nothing)
+problem/        Problem, YAML-backed ProblemRepository
+evaluation/     Evaluator, Rule ports; RuleEvaluator; evaluation/rules/ the seven rules
+parser/         SubmissionParser port, ParserRegistry; parser/javacode/ JavaParser adapter
+llm/            LlmClient port; prompt, reply parser, FindingValidator, review evaluator; Gemini, demo and fake clients
+attempt/        Attempt, AttemptLifecycle (transition table), AttemptRepository port
+orchestration/  services: AttemptService, EvaluationOrchestrator, ChangeImpactCalculator, FindingDiffer, history
+persistence/    JPA adapter (submission and report stored as JSON columns)
+web/            Thymeleaf controllers
+src/main/resources/problems/   one YAML file per problem
+</code></pre>
+<p>Adding a problem means adding a YAML file. Adding a rule means adding a <code>Rule</code> class. Adding an evaluation approach means adding an <code>Evaluator</code>. Adding a submission format means adding a <code>SubmissionParser</code>. Spring picks each up as a list, so nothing else changes.</p>
+<p>How good is the AI review? See <a href="docs/REVIEW_EVALUATION.md">docs/REVIEW_EVALUATION.md</a>. Re-run it with <code>./mvnw test -Dtest=LiveReviewQualityTest</code> and a <code>GEMINI_API_KEY</code>.</p>
+<p>More detail: <a href="docs/DESIGN_NOTE.md">docs/DESIGN_NOTE.md</a>, <a href="docs/RESEARCH_NOTE.md">docs/RESEARCH_NOTE.md</a>, <a href="AI_USAGE.md">AI_USAGE.md</a>.</p>
+<hr />
+<h1>AI usage</h1>
+<p>This file records decisions where the suggestion was not simply the spec, what was accepted or changed, and why.</p>
+<h2>1. Mermaid WebJar version</h2>
+<ul>
+<li><strong>AI suggested:</strong> pin <code>org.webjars.npm:mermaid:10.9.1</code> to serve Mermaid locally, as the spec requires (no CDN).</li>
+<li><strong>What happened:</strong> that version does not exist on Maven Central, and the first version tried afterwards failed on conflicting transitive version ranges.</li>
+<li><strong>Decision:</strong> use <code>11.12.3</code> and exclude all transitive dependencies, since <code>mermaid.min.js</code> is self-contained. A test checks the file is served.</li>
+<li><strong>Why:</strong> the spec's offline requirement outweighs the cost of one pinned dependency. <strong>Not verified:</strong> the diagram drawing in a real browser (no browser was available during the build).</li>
+</ul>
+<h2>2. Finding fingerprint</h2>
+<ul>
+<li><strong>Spec said:</strong> fingerprint = rule id + subject.</li>
+<li><strong>AI suggested:</strong> add an optional discriminator.</li>
+<li><strong>Why:</strong> <code>CAPABILITY_OWNERSHIP</code> reports one finding per missing capability, all on the entry type. With the plain fingerprint, two different missing capabilities collapse into one in the resolved / new / persisting diff, hiding real progress. A test (<code>twoMissingCapabilitiesHaveDifferentFingerprints</code>) fails without the change.</li>
+<li><strong>Decision:</strong> accepted. Other findings keep the exact spec fingerprint.</li>
+</ul>
+<h2>3. What "restates a FACT" means</h2>
+<ul>
+<li><strong>Spec said:</strong> drop an LLM finding that restates a FACT on the same subject.</li>
+<li><strong>AI first read it as:</strong> drop any LLM finding on a subject that has any FACT.</li>
+<li><strong>Rejected that reading:</strong> a class flagged for one reason can still deserve different AI comments (for example an encapsulation concern on a class flagged as an orphan).</li>
+<li><strong>Decision:</strong> drop only when the FACT is from a related rule, using a small category-to-rule table in <code>FindingValidator</code>. Tested.</li>
+</ul>
+<h2>4. How much of a broken file to keep</h2>
+<ul>
+<li><strong>Problem:</strong> JavaParser may return a partial tree even for class-level syntax errors, which would give the learner misleading findings.</li>
+<li><strong>AI suggested:</strong> keep a file with errors only when the errors are statement-level (JavaParser produces an unparsable-statement node); otherwise skip the whole file with a visible warning.</li>
+<li><strong>Why:</strong> matches the spec's failure table (method-body error keeps structure, class-level error skips the file) and was checked with tests for both cases.</li>
+</ul>
+<h2>5. Demo mode for the AI stage</h2>
+<ul>
+<li><strong>AI suggested:</strong> when no <code>GEMINI_API_KEY</code> is set, use a client that returns one clearly labelled placeholder finding, instead of failing every attempt as PARTIAL.</li>
+<li><strong>Why:</strong> lets a reviewer run the whole loop with no account. The placeholder says it is demo mode, so it cannot be mistaken for a real review.</li>
+<li><strong>Risk to check:</strong> a reviewer must not read demo output as a real evaluation. The README says so.</li>
+</ul>
+<h2>6. The AI review was reading a lossy picture of the code</h2>
+<ul>
+<li><strong>Found by:</strong> driving the real UI with the Elevator problem. Two of the three AI findings were factually wrong: it said <code>ElevatorSystem</code> held a single <code>Elevator</code> (the field was a <code>List&lt;Elevator&gt;</code>) and that <code>stops</code> was a raw <code>TreeSet</code> (it was <code>TreeSet&lt;Integer&gt;</code>).</li>
+<li><strong>Cause:</strong> the assistant's own prompt renderer printed the unwrapped type name, as the build spec describes for <code>FieldNode.type</code>, so the model could not see the generics. This was an assistant-introduced defect, not a model failure.</li>
+<li><strong>Decision:</strong> keep the unwrapped type for relationships and add a separate declared type for the prompt and diagram. After the change the same design produced no such claims. Tests assert the prompt shows <code>List&lt;Car&gt;</code> and never includes method bodies.</li>
+<li><strong>Lesson recorded:</strong> unit tests with a fake LLM could not have caught this; only a real review of a real design did.</li>
+</ul>
+<h2>7. A rule that rejected the right answer</h2>
+<ul>
+<li><strong>Spec said:</strong> ignore any method that repeats an entry-type method's name and parameter count when looking for who owns a capability.</li>
+<li><strong>Found by:</strong> the same Elevator run, where <code>Elevator.step()</code> was rejected as the mover because <code>ElevatorSystem.step()</code> has the same name.</li>
+<li><strong>Decision:</strong> the assistant narrowed it to the entry type's own public methods and added <code>pick</code>, <code>choose</code>, <code>nearest</code> and <code>serve</code> as dispatch hints. Two earlier tests were rewritten and three added. This is a deviation from the spec and needs the owner's confirmation.</li>
+</ul>
+<h2>8. A thread-safety bug found by the evaluation harness</h2>
+<ul>
+<li><strong>Found by:</strong> the live review check. Four designs reviewed in parallel; the parking designs came back with no findings at all, even the deliberately bad one.</li>
+<li><strong>Cause:</strong> the assistant's <code>JavaCodeParser</code> held one <code>JavaParser</code> shared by every thread. Under concurrent use valid code was reported as a syntax error ("Index 2147483647 out of bounds"). In the real app this would show when two learners submit at once.</li>
+<li><strong>Decision:</strong> one parser per thread. A test with 8 threads and 400 parses failed before the change and passes after.</li>
+<li><strong>Lesson recorded:</strong> the single-threaded unit tests passed for the whole build; only running real work in parallel exposed it.</li>
+</ul>
+<h2>9. Evaluating the AI review, and who did the labelling</h2>
+<ul>
+<li><strong>What the assistant did:</strong> wrote six designs, labelled the expected decision-point approaches, and chose the pass thresholds in <code>docs/REVIEW_EVALUATION.md</code>.</li>
+<li><strong>Risk to check:</strong> the same assistant built the platform and wrote its own exam. The numbers (94% decision-point match, 9% invented findings) show the loop behaves sensibly on those six designs, not that the review is accurate. The owner should replace or check the designs and labels.</li>
+</ul>
+<h2>What the AI did not do</h2>
+<ul>
+<li>The automated tests never call the real Gemini service (scripted fake only). The live service was exercised by hand through the UI on all three problems, with one design each. That shows the flow works, not that the review is accurate.</li>
+<li>It did not compare the AI review with human-written judgments.</li>
+<li>It did not tune rule thresholds on real learner code.</li>
+</ul>
+</body>
+</html>

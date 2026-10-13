@@ -1,0 +1,110 @@
+id: elevator
+title: Elevator System
+statement: Design a building with several elevators, a dispatcher, and a tick-based simulation.
+requirements:
+  - A building has several floors and several elevators.
+  - A person can call an elevator at a floor, asking to go up or down. A person inside an elevator can select a destination floor.
+  - A dispatcher decides which elevator serves a call.
+  - An elevator moves one floor per tick, stops at requested floors, and opens and closes its doors.
+  - An elevator keeps its direction while there are stops ahead, then reverses or goes idle.
+  - An elevator has a passenger limit. A request that would exceed it is refused with a reason.
+  - A request for a floor that does not exist is rejected.
+  - The simulation is tick-based so the design needs no threads and every run is repeatable.
+entryTypes:
+  - ElevatorSystem
+skeleton:
+  - name: ElevatorSystem.java
+    content: |
+      /** Entry point of the simulation. Keep these three method signatures. */
+      public class ElevatorSystem {
+
+          /** A person at a floor calls an elevator going up or down. */
+          public void requestElevator(int floor, Direction direction) {
+              throw new UnsupportedOperationException("TODO");
+          }
+
+          /** A person inside an elevator picks a destination floor. */
+          public void selectFloor(int elevatorId, int floor) {
+              throw new UnsupportedOperationException("TODO");
+          }
+
+          /** Advances the simulation by one tick. */
+          public void step() {
+              throw new UnsupportedOperationException("TODO");
+          }
+      }
+  - name: Direction.java
+    content: |
+      public enum Direction {
+          UP, DOWN
+      }
+capabilities:
+  - id: dispatch-call
+    description: decide which elevator serves a call
+    nameHints: [dispatch, assign, schedule, select, pick, choose, nearest, serve]
+    watchLiterals: false
+  - id: move-car
+    description: move an elevator one floor
+    nameHints: [move, step, advance, tick]
+    watchLiterals: false
+  - id: handle-doors
+    description: open and close doors
+    nameHints: [door, open, close]
+    watchLiterals: false
+  - id: queue-stops
+    description: hold the stops an elevator still has to make
+    nameHints: [stop, queue, enqueue, request]
+    watchLiterals: false
+  - id: enforce-capacity
+    description: enforce the passenger limit
+    nameHints: [capacity, overload, weight, limit, full]
+    watchLiterals: true
+decisionPoints:
+  - id: dispatch-strategy
+    question: Which elevator serves a call?
+    approaches:
+      - id: nearest-car
+        name: A dispatch strategy such as nearest car
+        signals: [interface for choosing an elevator, nearest or least-busy implementations]
+        tradeoff: Easy to swap; one more type.
+      - id: fixed-rule
+        name: A fixed rule inside the controller
+        signals: [loop with a distance comparison in the controller]
+        tradeoff: Simple, but every policy change edits the controller.
+      - id: round-robin
+        name: Round robin
+        signals: [index that cycles through elevators]
+        tradeoff: Fair and trivial, but ignores distance and direction.
+  - id: car-behaviour
+    question: How does a car behave by state?
+    approaches:
+      - id: state-pattern
+        name: The State pattern
+        signals: [state interface, Idle, MovingUp, MovingDown or DoorsOpen classes]
+        tradeoff: Each state is isolated; more classes for a small machine.
+      - id: enum-switch
+        name: An enum with a switch
+        signals: [enum of states, switch on the state]
+        tradeoff: Compact, but adding a state edits every switch.
+      - id: boolean-flags
+        name: Boolean flags
+        signals: [fields such as moving and doorsOpen]
+        tradeoff: Quick to write, but impossible states become easy to reach.
+  - id: stop-holding
+    question: How are stops held?
+    approaches:
+      - id: sorted-per-direction
+        name: Sorted stops per direction
+        signals: [TreeSet or sorted list for up and for down]
+        tradeoff: Gives sweep behaviour naturally; two collections to keep in sync.
+      - id: fifo-queue
+        name: A FIFO queue
+        signals: [Queue of floors]
+        tradeoff: Simple and fair, but the car zig-zags.
+      - id: priority-by-distance
+        name: Priority by distance
+        signals: [PriorityQueue with a distance comparator]
+        tradeoff: Short trips, but far requests can starve.
+changeRequest:
+  id: service-elevator
+  text: Add an elevator that serves only some floors, for example a service elevator. The dispatcher must respect the restriction.

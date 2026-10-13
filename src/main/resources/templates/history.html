@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Attempt history')}"></head>
+<body>
+<header th:replace="~{fragments :: nav}"></header>
+<main>
+  <p class="muted"><a th:href="@{/}">Problems</a> / <a th:href="@{/problems/{id}(id=${problem.id()})}" th:text="${problem.title()}">Problem</a></p>
+  <h1>Attempt history <span class="muted" th:text="'- ' + ${problem.title()}"></span></h1>
+  <p class="muted" th:if="${rows.isEmpty()}">No attempts yet.</p>
+  <table th:if="${!rows.isEmpty()}">
+    <thead><tr><th>#</th><th>Kind</th><th>Status</th><th>When</th><th>FACT findings</th><th>AI opinions</th><th>Change impact</th><th>Against previous</th></tr></thead>
+    <tbody>
+      <tr th:each="r : ${rows}">
+        <td><a th:href="@{/attempts/{id}(id=${r.attemptId()})}" th:text="${r.sequence()}">1</a></td>
+        <td th:text="${r.kind().name() == 'CHANGE_REVISION'} ? 'Change round' : 'Initial'">Initial</td>
+        <td><span class="badge" th:classappend="${r.status()}" th:text="${r.status()}">COMPLETED</span></td>
+        <td th:text="${r.whenText()}">time</td>
+        <td>
+          <span th:each="s : ${r.factCounts().keySet()}" th:if="${r.factCounts().get(s) > 0}">
+            <span class="badge" th:classappend="${s}" th:text="${s}">HIGH</span> <span th:text="${r.factCounts().get(s)}"></span>&nbsp;
+          </span>
+        </td>
+        <td th:text="${r.judgmentCount()}">0</td>
+        <td th:text="${r.verdict() != null} ? ${r.verdict()} : '-'">-</td>
+        <td th:text="${r.summary().isEmpty()} ? '-' : ${r.summary()}">-</td>
+      </tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

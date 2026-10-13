@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Editor')}"></head>
+<body>
+<header th:replace="~{fragments :: nav}"></header>
+<main>
+  <p class="muted"><a th:href="@{/}">Problems</a> / <a th:href="@{/problems/{id}(id=${problem.id()})}" th:text="${problem.title()}">Problem</a></p>
+  <h1>Attempt <span th:text="${attempt.sequence()}">1</span>
+    <span class="badge DRAFT">DRAFT</span>
+    <span class="badge INFO" th:if="${isChange}">Change round</span></h1>
+
+  <div class="notice error" th:if="${error != null}" role="alert" th:text="${error}">Error</div>
+  <div class="notice info" th:if="${param.saved != null}">Draft saved.</div>
+
+  <div class="panel" th:if="${isChange}">
+    <h3>Change request</h3>
+    <p th:text="${problem.changeRequest().text()}">Change</p>
+    <p class="muted">Edit your existing code to absorb this change. After you submit you will see how much of your design had to move.</p>
+  </div>
+
+  <form method="post" data-busy="Submitting..." th:action="@{/attempts/{id}/submit(id=${attempt.id()})}">
+    <div class="filebox" th:each="f : ${submission.files()}">
+      <input type="hidden" name="fileName" th:value="${f.name()}">
+      <label><span class="fname" th:text="${f.name()}">File.java</span></label>
+      <textarea class="code" name="fileContent" spellcheck="false" th:text="${f.content()}"></textarea>
+    </div>
+
+    <div class="filebox">
+      <label for="newFileName">Add another file (optional)</label>
+      <input type="text" id="newFileName" name="newFileName" placeholder="MyClass.java">
+      <textarea class="code" name="newFileContent" spellcheck="false" placeholder="Paste Java code here"></textarea>
+    </div>
+
+    <label for="assumptions">Assumptions</label>
+    <textarea id="assumptions" name="assumptions" rows="3" th:text="${submission.assumptions()}"></textarea>
+
+    <label for="patternUsed">Pattern used, and why (one line)</label>
+    <input type="text" id="patternUsed" name="patternUsed" th:value="${submission.rationale().patternUsed()}">
+    <label for="patternRejected">Pattern rejected, and why (one line)</label>
+    <input type="text" id="patternRejected" name="patternRejected" th:value="${submission.rationale().patternRejected()}">
+    <label for="note">Anything else</label>
+    <input type="text" id="note" name="note" th:value="${submission.rationale().note()}">
+
+    <p>
+      <button type="submit">Submit</button>
+      <button type="submit" class="secondary" th:formaction="@{/attempts/{id}/draft(id=${attempt.id()})}">Save draft</button>
+    </p>
+    <p class="muted">Your code is parsed for structure only. It is never compiled or run.</p>
+  </form>
+</main>
+<script th:src="@{/js/attempt.js(v=3)}"></script>
+</body>
+</html>

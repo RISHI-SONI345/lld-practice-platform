@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title th:text="${title}">LLD Practice</title>
+  <link rel="stylesheet" th:href="@{/css/app.css(v=3)}">
+  <script th:src="@{/js/theme.js(v=1)}"></script>
+</head>
+<body>
+<header class="top" th:fragment="nav">
+  <a th:href="@{/}">LLD Practice</a>
+  <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Change colour theme">Theme: System</button>
+</header>
+
+<div th:fragment="finding(f)" class="finding" th:classappend="'sev-' + ${f.severity()}">
+  <h3>
+    <span class="badge" th:classappend="${f.kind()}" th:text="${f.kind()}">FACT</span>
+    <span class="badge" th:classappend="${f.severity()}" th:text="${f.severity()}">LOW</span>
+    <span th:text="${f.subject()}">Subject</span>
+    <span class="muted" th:if="${f.kind().name() == 'JUDGMENT'}" th:text="'· ' + ${f.ruleId()}"></span>
+  </h3>
+  <p th:text="${f.message()}">Message</p>
+  <p class="ev" th:if="${!f.evidence().isEmpty()}">
+    <span th:each="e, st : ${f.evidence()}"><span th:text="${e.file()} + ':' + ${e.line()}"></span><span th:if="${!st.last}">, </span></span>
+  </p>
+  <p class="why"><strong>Why it matters:</strong> <span th:text="${f.why()}"></span></p>
+  <p class="fix"><strong>Fix:</strong> <span th:text="${f.fix()}"></span></p>
+  <p class="trade" th:if="${f.tradeoff() != null and !f.tradeoff().isEmpty()}"><strong>When the current choice is fine:</strong> <span th:text="${f.tradeoff()}"></span></p>
+</div>
+</body>
+</html>

@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Something went wrong')}"></head>
+<body>
+<header th:replace="~{fragments :: nav}"></header>
+<main>
+  <h1 th:text="${title != null} ? ${title} : 'Something went wrong'">Something went wrong</h1>
+  <p th:text="${message != null} ? ${message} : 'Please go back and try again.'">Message</p>
+  <p><a class="button" th:href="@{/}">Back to the problems</a></p>
+</main>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Attempt')}"></head>
+<body>
+<header th:replace="~{fragments :: nav}"></header>
+<main id="attempt" th:attr="data-attempt-id=${attempt.id()},data-status=${attempt.status()}">
+  <p class="muted"><a th:href="@{/}">Problems</a> /
+    <a th:href="@{/problems/{id}(id=${problem.id()})}" th:text="${problem.title()}">Problem</a> /
+    <a th:href="@{/problems/{id}/history(id=${problem.id()})}">History</a></p>
+  <h1>Attempt <span th:text="${attempt.sequence()}">1</span>
+    <span class="badge" th:classappend="${attempt.status()}" th:text="${attempt.status()}">COMPLETED</span>
+    <span class="badge INFO" th:if="${isChange}">Change round</span></h1>
+
+  <div class="notice info loader" th:if="${running}" id="running" role="status" aria-live="polite">
+    <span class="spinner" aria-hidden="true"></span>
+    <span>
+      <strong>Waiting for the AI review<span id="elapsed"></span></strong><br>
+      The rule-based findings below are ready now. This page updates by itself when the review ends, usually within
+      a minute.
+    </span>
+  </div>
+
+  <div class="notice warn" th:if="${attempt.status().name() == 'PARTIAL'}">
+    <strong>The AI review was unavailable.</strong>
+    <span th:text="${attempt.failureReason()}">reason</span>
+    The rule-based findings below are still valid.
+    <form class="inline" method="post" data-busy="Retrying..." th:action="@{/attempts/{id}/retry(id=${attempt.id()})}">
+      <button type="submit">Retry the AI review</button>
+    </form>
+  </div>
+
+  <div class="notice error" th:if="${attempt.status().name() == 'FAILED'}">
+    <strong>We could not read your code.</strong>
+    <p th:text="${attempt.failureReason()}">reason</p>
+    <form class="inline" method="post" th:action="@{/attempts/{id}/edit-again(id=${attempt.id()})}">
+      <button type="submit">Edit and resubmit</button>
+    </form>
+  </div>
+
+  <div class="strip" aria-label="Summary">
+    <span><span class="badge FACT">FACT</span></span>
+    <span th:each="s : ${factCounts.keySet()}" th:if="${factCounts.get(s) > 0}">
+      <span class="badge" th:classappend="${s}" th:text="${s}">HIGH</span> <span th:text="${factCounts.get(s)}">1</span>
+    </span>
+    <span th:if="${report.facts().isEmpty()}" class="muted">no rule findings</span>
+    <span><span class="badge JUDGMENT">JUDGMENT</span> <span th:text="${report.judgments().size()}">0</span></span>
+  </div>
+
+  <h2>Rule-based findings <span class="badge FACT">FACT</span></h2>
+  <p class="muted">Repeatable checks on the structure of your code. The same code always gives the same facts.</p>
+  <p class="muted" th:if="${factGroups.isEmpty() and attempt.status().name() != 'FAILED'}">No rule findings.</p>
+  <th:block th:each="entry : ${factGroups}">
+    <th:block th:each="f : ${entry.value}"><div th:replace="~{fragments :: finding(${f})}"></div></th:block>
+  </th:block>
+  <div th:if="${attempt.status().name() == 'FAILED'}">
+    <th:block th:each="f : ${report.facts()}"><div th:replace="~{fragments :: finding(${f})}"></div></th:block>
+  </div>
+
+  <div th:if="${attempt.status().name() == 'COMPLETED' or attempt.status().name() == 'PARTIAL'}">
+    <h2>AI review <span class="badge JUDGMENT">JUDGMENT</span></h2>
+    <p class="muted"><strong>AI opinion, advisory.</strong> A different valid design is not an error. The model may vary between runs.</p>
+    <p class="muted" th:if="${report.judgments().isEmpty() and attempt.status().name() == 'COMPLETED'}">The AI review returned no usable findings.</p>
+    <p class="muted" th:if="${attempt.status().name() == 'PARTIAL'}">Not available for this attempt.</p>
+    <th:block th:each="f : ${report.judgments()}"><div th:replace="~{fragments :: finding(${f})}"></div></th:block>
+
+    <div th:if="${!report.assessments().isEmpty()}">
+      <h3>Decision points</h3>
+      <table>
+        <thead><tr><th>Decision</th><th>Approach you used</th><th>Matches your rationale</th><th>Trade-off</th></tr></thead>
+        <tbody>
+          <tr th:each="a : ${report.assessments()}">
+            <td>
+              <span th:each="d : ${problem.decisionPoints()}" th:if="${d.id() == a.decisionPointId()}" th:text="${d.question()}"></span>
+            </td>
+            <td th:text="${a.approachUsed()}">x</td>
+            <td th:text="${a.agreesWithRationale()} ? 'Yes' : 'No'">Yes</td>
+            <td th:text="${a.tradeoff()}">t</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div th:if="${!report.strengths().isEmpty()}">
+      <h3>Strengths</h3>
+      <ul class="plain"><li th:each="s : ${report.strengths()}" th:text="${s}">s</li></ul>
+    </div>
+  </div>
+
+  <div th:if="${!report.mermaid().isEmpty()}">
+    <h2>Class diagram from your code</h2>
+    <div class="diagram" id="diagram" aria-label="Generated class diagram">Drawing the diagram...</div>
+    <details>
+      <summary>Mermaid source</summary>
+      <pre class="src" id="mermaid-src" th:text="${report.mermaid()}">classDiagram</pre>
+    </details>
+  </div>
+
+  <div th:if="${report.changeImpact() != null}">
+    <h2>Blast radius of the change</h2>
+    <div class="panel">
+      <p><strong>Verdict: <span th:text="${report.changeImpact().verdict()}">CONTAINED</span></strong>
+        <span class="muted" th:switch="${report.changeImpact().verdict().name()}">
+          <span th:case="'ADDITIVE'">- you added code and did not have to touch anything that existed.</span>
+          <span th:case="'CONTAINED'">- the change touched only a couple of existing classes, and you added at least as many.</span>
+          <span th:case="*">- the change spread across your existing classes. Look at what had to move.</span>
+        </span></p>
+      <div class="cols">
+        <div><h3>Added</h3><ul class="plain"><li th:each="c : ${report.changeImpact().added()}" th:text="${c}"></li></ul><span class="muted" th:if="${report.changeImpact().added().isEmpty()}">none</span></div>
+        <div><h3>Modified</h3><ul class="plain"><li th:each="c : ${report.changeImpact().modified()}" th:text="${c}"></li></ul><span class="muted" th:if="${report.changeImpact().modified().isEmpty()}">none</span></div>
+        <div><h3>Removed</h3><ul class="plain"><li th:each="c : ${report.changeImpact().removed()}" th:text="${c}"></li></ul><span class="muted" th:if="${report.changeImpact().removed().isEmpty()}">none</span></div>
+        <div><h3>Interfaces touched</h3><ul class="plain"><li th:each="c : ${report.changeImpact().interfacesTouched()}" th:text="${c}"></li></ul><span class="muted" th:if="${report.changeImpact().interfacesTouched().isEmpty()}">none</span></div>
+      </div>
+      <p class="muted">The cut-offs are heuristics: contained means at most 2 classes modified or removed, and not more than were added.</p>
+    </div>
+  </div>
+
+  <div th:if="${diff != null}">
+    <h2>Compared with attempt <span th:text="${diff.previousSequence()}">1</span></h2>
+    <div class="cols">
+      <div class="panel"><h3>Resolved <span th:text="'(' + ${diff.facts().resolved().size()} + ')'"></span></h3>
+        <ul class="plain"><li th:each="f : ${diff.facts().resolved()}"><span class="badge FACT">FACT</span> <span th:text="${f.ruleId()} + ' on ' + ${f.subject()}"></span></li></ul></div>
+      <div class="panel"><h3>New <span th:text="'(' + ${diff.facts().added().size()} + ')'"></span></h3>
+        <ul class="plain"><li th:each="f : ${diff.facts().added()}"><span class="badge FACT">FACT</span> <span th:text="${f.ruleId()} + ' on ' + ${f.subject()}"></span></li></ul></div>
+      <div class="panel"><h3>Persisting <span th:text="'(' + ${diff.facts().persisting().size()} + ')'"></span></h3>
+        <ul class="plain"><li th:each="f : ${diff.facts().persisting()}"><span class="badge FACT">FACT</span> <span th:text="${f.ruleId()} + ' on ' + ${f.subject()}"></span></li></ul></div>
+    </div>
+    <div th:if="${diff.judgmentsComparable()}">
+      <h3>AI opinion changes <span class="muted">(these may vary between runs)</span></h3>
+      <p th:text="${diff.judgments().summary()}">0 resolved, 0 new, 0 persisting</p>
+    </div>
+    <p class="muted" th:if="${!diff.judgmentsComparable()}">Only rule-based findings are compared, because the AI review was unavailable for one of these attempts.</p>
+  </div>
+
+  <div th:if="${canChange and !isChange}" class="panel">
+    <h2>Change request</h2>
+    <p th:text="${problem.changeRequest().text()}">Change</p>
+    <form method="post" data-busy="Opening the editor..." th:action="@{/attempts/{id}/change-request(id=${attempt.id()})}">
+      <button type="submit">Start the change request</button>
+    </form>
+  </div>
+
+  <h2>How the evaluation ran</h2>
+  <table th:if="${!report.runs().isEmpty()}">
+    <thead><tr><th>Evaluator</th><th>Stage</th><th>Outcome</th><th>Tries</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr th:each="r : ${report.runs()}">
+        <td th:text="${r.evaluatorId()}">rules</td><td th:text="${r.stage()}">IMMEDIATE</td>
+        <td><span class="badge" th:classappend="${r.outcome().name() == 'OK'} ? 'COMPLETED' : 'FAILED'" th:text="${r.outcome()}">OK</span></td>
+        <td th:text="${r.attemptsUsed()}">1</td><td th:text="${r.message()}">note</td>
+      </tr>
+    </tbody>
+  </table>
+</main>
+<script th:src="@{/webjars/mermaid/11.12.3/dist/mermaid.min.js}"></script>
+<script th:src="@{/js/attempt.js(v=3)}"></script>
+</body>
+</html>
